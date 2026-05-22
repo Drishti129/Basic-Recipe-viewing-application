@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recipes App</title>
+  <link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + ReactDOM + Babel (for quick dev-only JSX transform) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [recipesList, setRecipesList] = useState([]);
+      const [selectedRecipe, setSelectedRecipe] = useState(null);
+      const [searchVal, setSearchVal] = useState('');
+      const [chefData, setChefData] = useState(null);
+      const [activeCategory, setActiveCategory] = useState('All Ratings');
+      const [uiLoading, setUiLoading] = useState(false);
+      const [viewMode, setViewMode] = useState('browse');
+
+      useEffect(() => {
+        fetch('http://localhost:5000/api/recipes')
+          .then(res => res.json())
+          .then(data => {
+            setRecipesList(data);
+            if (data.length > 0) setSelectedRecipe(data[0]);
+          })
+          .catch(err => console.error("Error connected to database stream:", err));
+
+        fetch('http://localhost:5000/api/chef-showcase')
+          .then(res => res.json())
+          .then(data => setChefData(data))
+          .catch(err => console.error("Error matching chef details:", err));
+      }, []);
+
+      const runSearchQuery = async () => {
+        if (!searchVal.trim()) return;
+        setUiLoading(true);
+        try {
+          const res = await fetch(`http://localhost:5000/api/recipe?dish=${encodeURIComponent(searchVal)}`);
+          if (res.ok) {
+            const matchingRecord = await res.json();
+            setSelectedRecipe(matchingRecord);
+          } else {
+            alert("No certified dish found in dataset matching criteria parameters.");
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setUiLoading(false);
+        }
+      };
+
+      const handleBookmarkAction = () => {
+        alert('Your current recipe has been added to Bookmarks.');
+      };
+
+      const handleNotificationsAction = () => {
+        alert('No new notifications at the moment.');
+      };
+
+      const handleProfileAction = () => {
+        alert('Profile center is coming soon.');
+      };
+
+      const handleViewGuideClick = () => {
+        setViewMode('guide');
+      };
+
+      const handleBackToGallery = () => {
+        setViewMode('browse');
+      };
+
+      const handleCardBookmarkClick = (e, recipe) => {
+        e.stopPropagation();
+        alert(`Saved ${recipe.dishName} to Bookmarks!`);
+      };
+
+      if (viewMode === 'guide' && selectedRecipe) {
+        return (
+          <div className="app-container">
+            <header className="main-header">
+              <span className="brand-title">Recipe Guide</span>
+              <div className="header-actions">
+                <button className="icon-btn" type="button" onClick={handleBackToGallery}>⬅</button>
+              </div>
+            </header>
+            <main className="recipes-catalog-pane">
+              <div className="category-filter-row">
+                <button type="button" className="filter-pill active" onClick={handleBackToGallery}>Back to Gallery</button>
+              </div>
+              <div className="recipes-grid" style={{ display: 'block' }}>
+                <div className="recipe-card" style={{ transform: 'none', border: 'none' }}>
+                  <div className="image-container">
+                    <img src={selectedRecipe.imageUrl} alt={selectedRecipe.dishName} />
+                  </div>
+                  <div className="recipe-info-block">
+                    <h2>{selectedRecipe.dishName}</h2>
+                    <p>{selectedRecipe.description || 'Full preparation guide for this recipe.'}</p>
+                    <p><strong>Chef:</strong> {selectedRecipe.chef}</p>
+                    <p><strong>Rating:</strong> {selectedRecipe.rating}</p>
+                    <p><strong>Time:</strong> {selectedRecipe.totalMinutes || 'N/A'} mins</p>
+                    <p><strong>Ingredients:</strong> {selectedRecipe.tags.join(', ') || 'N/A'}</p>
+                    <div style={{ marginTop: '18px' }}>
+                      <h4 style={{ marginBottom: '10px' }}>Preparation Steps</h4>
+                      <ol style={{ paddingLeft: '20px', color: '#2c3e50' }}>
+                        {selectedRecipe.steps.map((step, idx) => (
+                          <li key={idx} style={{ marginBottom: '10px' }}>{step}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        );
+      }
+
+      return (
+        <div className="app-container">
+          <header className="main-header">
+            <span className="brand-title">Recipes</span>
+            <div className="search-wrapper">
+              <input 
+                type="text" 
+                placeholder="Search by dish, chef, or cuisine parameters..."
+                value={searchVal}
+                onChange={(e) => setSearchVal(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && runSearchQuery()}
+              />
+            </div>
+            <div className="header-actions">
+              <button className="icon-btn" onClick={runSearchQuery}>🔍</button>
+            <button className="icon-btn" onClick={handleBookmarkAction}>🔖</button>
+            <button className="icon-btn" onClick={handleNotificationsAction}>🔔</button>
+            <button className="icon-btn" onClick={handleProfileAction}>👤</button>
+            </div>
+          </header>
+
+          <div className="dashboard-layout">
+            <main className="recipes-catalog-pane">
+              <div className="category-filter-row">
+                {['Famous Chefs', 'Trending Now', 'All Ratings', 'Cuisine Type', 'Dietary Needs'].map((pill) => (
+                  <button 
+                    key={pill} 
+                    className={`filter-pill ${activeCategory === pill ? 'active' : ''}`}
+                    onClick={() => setActiveCategory(pill)}
+                  >
+                    {pill}
+                  </button>
+                ))}
+              </div>
+
+              {uiLoading && <p style={{ color: '#e67e22', marginBottom: '20px' }}>Analyzing Kaggle CSV schemas...</p>}
+
+              <div className="recipes-grid">
+                {recipesList.map((recipe) => (
+                  <div 
+                    key={recipe.id} 
+                    className="recipe-card"
+                    onClick={() => setSelectedRecipe(recipe)}
+                    style={selectedRecipe?.id === recipe.id ? { ringWidth: '3px', borderColor: '#e67e22', borderStyle: 'solid' } : {}}
+                  >
+                    <div className="image-container">
+                      <img src={recipe.imageUrl} alt={recipe.dishName} />
+                      <span className={`card-chef-badge ${recipe.badgeType}`}>
+                        {recipe.badgeType === 'famous' ? '★' : '✓'} {recipe.badgeText}
+                      </span>
+                      <button className="bookmark-btn" onClick={(e) => handleCardBookmarkClick(e, recipe)}>🔖</button>
+                    </div>
+                    <div className="recipe-info-block">
+                      <h4>{recipe.dishName}</h4>
+                      <div className="rating-row">
+                        <span>{"★".repeat(Math.round(recipe.rating) || 4)}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#7f8c8d', marginLeft: '4px' }}>
+                          ({recipe.rating})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </main>
+
+            <aside className="utility-sidebar-pane">
+              {chefData && (
+                <div className="chef-showcase-profile">
+                  <div className="chef-avatar-wrapper">
+                    <img src={chefData.avatarUrl} alt={chefData.name} />
+                  </div>
+                  <h3>Laure Shan</h3>
+                  <p style={{ color: '#7f8c8d', fontSize: '0.8rem', margin: '4px 0 12px 0' }}>★★★★★ Top Chef</p>
+                  <p>{chefData.bio}</p>
+                </div>
+              )}
+
+              {selectedRecipe && (
+                <div>
+                  <hr style={{ border: 'none', borderTop: '1px solid #f5efe6', margin: '20px 0' }} />
+                  <h3 className="metrics-section-title" style={{ color: '#e67e22' }}>
+                    Active Selection Metrics
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '16px' }}>
+                    Current: {selectedRecipe.dishName} <br />
+                    <span style={{ fontWeight: 'normal', color: '#7f8c8d' }}>By {selectedRecipe.chef}</span>
+                  </p>
+
+                  <div className="slider-group">
+                    <label>Ease of Prep ({selectedRecipe.metrics.prepEase}%)</label>
+                    <input type="range" readOnly className="custom-range-slider" value={selectedRecipe.metrics.prepEase} min="0" max="100" />
+                  </div>
+
+                  <div className="slider-group">
+                    <label>Flavor Profile ({selectedRecipe.metrics.flavorProfile}%)</label>
+                    <input type="range" readOnly className="custom-range-slider" value={selectedRecipe.metrics.flavorProfile} min="0" max="100" />
+                  </div>
+
+                  <div className="slider-group">
+                    <label>Nutritional Density Value ({selectedRecipe.metrics.nutritionalValue}%)</label>
+                    <input type="range" readOnly className="custom-range-slider" value={selectedRecipe.metrics.nutritionalValue} min="0" max="100" />
+                  </div>
+
+                  <div className="slider-group">
+                    <label>Complexity Weight ({selectedRecipe.metrics.complexity}%)</label>
+                    <input type="range" readOnly className="custom-range-slider" value={selectedRecipe.metrics.complexity} min="0" max="100" />
+                  </div>
+
+                  <div style={{ marginTop: '20px' }}>
+                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '8px' }}>
+                      Community Reviews Section
+                    </h4>
+                    {selectedRecipe.reviews.map((r, idx) => (
+                      <div key={idx} style={{ backgroundColor: '#fbf6ee', padding: '12px', borderRadius: '8px', fontSize: '0.8rem', lineBreak: 'auto' }}>
+                        <strong>{r.user}:</strong> "{r.comment}"
+                      </div>
+                    ))}
+                  </div>
+
+                  <button type="button" className="action-cta-button" onClick={handleViewGuideClick}>
+                    View Full Preparation Guide
+                  </button>
+                </div>
+              )}
+            </aside>
+          </div>
+
+          <footer className="main-footer">
+            <p>© 2026 Gourmet Passport Core interface system engine. All assets indexed accurately from Tasty dataset inputs.</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
